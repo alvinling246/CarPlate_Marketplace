@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Hide scrollbar for category filter on mobile */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
