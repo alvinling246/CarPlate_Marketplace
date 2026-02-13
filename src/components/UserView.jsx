@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { usePlates } from '../contexts/PlateContext.jsx';
 import { PlateCard } from './PlateCard.jsx';
@@ -8,24 +8,37 @@ import { Pagination } from './Pagination.jsx';
 const ITEMS_PER_PAGE = 9;
 
 export function UserView() {
-  const { searchPlates, plates } = usePlates();
+  const { searchPlates, plates, loading, error } = usePlates();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All Carplates');
   const [currentPage, setCurrentPage] = useState(1);
-  const [allResults, setAllResults] = useState(() => searchPlates('', 'All Carplates'));
+  const [allResults, setAllResults] = useState([]);
+
+  // Load initial results
+  useEffect(() => {
+    const loadInitialResults = async () => {
+      const results = await searchPlates('', 'All Carplates');
+      setAllResults(results);
+    };
+    loadInitialResults();
+  }, [searchPlates]);
+
+  // Update results when search or category changes
+  useEffect(() => {
+    const updateResults = async () => {
+      const results = await searchPlates(searchQuery, activeCategory);
+      setAllResults(results);
+      setCurrentPage(1);
+    };
+    updateResults();
+  }, [searchQuery, activeCategory, searchPlates]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
-    const results = searchPlates(query, activeCategory);
-    setAllResults(results);
-    setCurrentPage(1);
   };
 
   const handleCategoryChange = (category) => {
     setActiveCategory(category);
-    const results = searchPlates(searchQuery, category);
-    setAllResults(results);
-    setCurrentPage(1);
   };
 
   const handlePageChange = (page) => {
@@ -35,11 +48,43 @@ export function UserView() {
 
   const availablePlatesCount = plates.filter(p => !p.isSold).length;
   
-  // Pagination calculations
-  const totalPages = Math.ceil(allResults.length / ITEMS_PER_PAGE);
+  // Ensure allResults is always an array; show only available plates in catalog
+  const safeResults = Array.isArray(allResults) ? allResults : [];
+  const availableResults = safeResults.filter(p => !p.isSold);
+  
+  // Pagination calculations (based on available plates only)
+  const totalPages = Math.ceil(availableResults.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedResults = allResults.slice(startIndex, endIndex);
+  const paginatedResults = availableResults.slice(startIndex, endIndex);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="text-center py-12">
+          <p className="text-sm sm:text-base text-gray-500">Loading plates...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="text-center py-12">
+          <p className="text-sm sm:text-base text-red-600 mb-2">Error loading plates: {error}</p>
+          <p className="text-xs text-gray-500 mt-4">
+            Make sure the backend is running at http://localhost:5000
+          </p>
+          <p className="text-xs text-gray-500">
+            Check browser console (F12) for more details
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -77,7 +122,7 @@ export function UserView() {
       {/* Results */}
       <div className="mb-4">
         <p className="text-sm sm:text-base text-gray-600">
-          Showing {startIndex + 1}-{Math.min(endIndex, allResults.length)} of {allResults.length} {allResults.length === 1 ? 'plate' : 'plates'}
+          Showing {startIndex + 1}-{Math.min(endIndex, availableResults.length)} of {availableResults.length} {availableResults.length === 1 ? 'plate' : 'plates'}
           {activeCategory !== 'All Carplates' && ` in ${activeCategory}`}
         </p>
       </div>

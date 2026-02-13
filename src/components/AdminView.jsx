@@ -1,32 +1,62 @@
-import { useState } from 'react';
-import { Plus, Edit2, CheckCircle, X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Plus, Edit2, CheckCircle, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePlates } from '../contexts/PlateContext.jsx';
+
+const PLATES_PER_PAGE = 10;
+const CATEGORY_OPTIONS = ['All Categories', '2 DIGIT', '3 DIGIT', '4 DIGIT', 'CLASSIC', 'GOLDEN NUMBER', 'OFFER'];
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Status' },
+  { value: 'available', label: 'Available' },
+  { value: 'sold', label: 'Sold' },
+];
+const SORT_OPTIONS = [
+  { value: 'price_asc', label: 'Price: Low → High' },
+  { value: 'price_desc', label: 'Price: High → Low' },
+  { value: 'date_asc', label: 'Date: Oldest first' },
+  { value: 'date_desc', label: 'Date: Newest first' },
+];
 
 export function AdminView() {
   const { plates, addPlate, updatePrice, markSold } = usePlates();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editPrice, setEditPrice] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All Categories');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterDate, setFilterDate] = useState('');
+  const [sortBy, setSortBy] = useState('date_desc');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterCategory, filterStatus, filterDate, sortBy]);
 
   const [newPlate, setNewPlate] = useState({
     plateNumber: '',
     price: '',
     category: '2 DIGIT',
   });
+  const [addError, setAddError] = useState('');
 
-  const handleAddPlate = (e) => {
+  const handleAddPlate = async (e) => {
     e.preventDefault();
+    setAddError('');
     if (!newPlate.plateNumber || !newPlate.price) return;
 
-    addPlate({
-      plateNumber: newPlate.plateNumber.toUpperCase(),
-      price: parseFloat(newPlate.price),
-      isSold: false,
-      category: newPlate.category,
-    });
-
-    setNewPlate({ plateNumber: '', price: '', category: '2 DIGIT' });
-    setShowAddModal(false);
+    try {
+      await addPlate({
+        plateNumber: newPlate.plateNumber.toUpperCase(),
+        price: parseFloat(newPlate.price),
+        isSold: false,
+        category: newPlate.category,
+      });
+      setNewPlate({ plateNumber: '', price: '', category: '2 DIGIT' });
+      setShowAddModal(false);
+    } catch (err) {
+      setAddError(err.message || 'Failed to add plate. Please try again.');
+    }
   };
 
   const handleEditPrice = (plate) => {
@@ -47,6 +77,46 @@ export function AdminView() {
     setEditingId(null);
     setEditPrice('');
   };
+
+  // Filtered and sorted plates for table (search + category + status + date, then sort)
+  const filteredPlates = useMemo(() => {
+    let result = [...(plates || [])];
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (q) {
+      result = result.filter((p) => (p.plateNumber || '').toLowerCase().includes(q));
+    }
+    if (filterCategory && filterCategory !== 'All Categories') {
+      result = result.filter((p) => p.category === filterCategory);
+    }
+    if (filterStatus === 'available') {
+      result = result.filter((p) => !p.isSold);
+    } else if (filterStatus === 'sold') {
+      result = result.filter((p) => p.isSold);
+    }
+    if (filterDate) {
+      const targetDate = filterDate.trim();
+      result = result.filter((p) => {
+        const d = (p.addedDate || '').toString().slice(0, 10);
+        return d === targetDate;
+      });
+    }
+    // Sort
+    if (sortBy === 'price_asc') {
+      result.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    } else if (sortBy === 'price_desc') {
+      result.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+    } else if (sortBy === 'date_asc') {
+      result.sort((a, b) => ((a.addedDate || '') < (b.addedDate || '') ? -1 : (a.addedDate || '') > (b.addedDate || '') ? 1 : 0));
+    } else {
+      // date_desc (newest first)
+      result.sort((a, b) => ((b.addedDate || '') < (a.addedDate || '') ? -1 : (b.addedDate || '') > (a.addedDate || '') ? 1 : 0));
+    }
+    return result;
+  }, [plates, searchQuery, filterCategory, filterStatus, filterDate, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPlates.length / PLATES_PER_PAGE));
+  const startIndex = (currentPage - 1) * PLATES_PER_PAGE;
+  const paginatedPlates = filteredPlates.slice(startIndex, startIndex + PLATES_PER_PAGE);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -89,6 +159,69 @@ export function AdminView() {
         </div>
       </div>
 
+      {/* Search & Filters */}
+      <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by plate number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[160px]"
+          >
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[140px]"
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <label htmlFor="filter-date" className="text-sm text-gray-600 whitespace-nowrap">Added date:</label>
+            <input
+              id="filter-date"
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort-by" className="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
+            <select
+              id="sort-by"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[180px]"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="text-sm text-gray-500 mt-3">
+          Showing {filteredPlates.length} of {plates.length} plates
+          {filteredPlates.length > PLATES_PER_PAGE && (
+            <span className="ml-2">· Page {currentPage} of {totalPages}</span>
+          )}
+        </p>
+      </div>
+
       {/* Plates Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
@@ -116,7 +249,14 @@ export function AdminView() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {plates.map((plate) => (
+              {paginatedPlates.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    No plates match your search or filters. Try adjusting the criteria.
+                  </td>
+                </tr>
+              ) : (
+              paginatedPlates.map((plate) => (
                 <tr key={plate.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <span className="font-mono font-semibold text-gray-900">
@@ -192,10 +332,42 @@ export function AdminView() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        {filteredPlates.length > PLATES_PER_PAGE && (
+          <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
+            <p className="text-sm text-gray-600">
+              Showing {startIndex + 1}–{Math.min(startIndex + PLATES_PER_PAGE, filteredPlates.length)} of {filteredPlates.length} plates
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+              <span className="text-sm text-gray-600 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Plate Modal */}
@@ -205,12 +377,19 @@ export function AdminView() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Add New Plate</h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                type="button"
+                onClick={() => { setShowAddModal(false); setAddError(''); }}
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-6 h-6 text-gray-600" />
               </button>
             </div>
+
+            {addError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{addError}</p>
+              </div>
+            )}
 
             <form onSubmit={handleAddPlate} className="space-y-4">
               <div>
@@ -262,7 +441,7 @@ export function AdminView() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setAddError(''); }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
