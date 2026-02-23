@@ -1,11 +1,12 @@
--- SQL Script to create Plates table in ebm_plateno database
+-- SQL Script to create Plates and Dealers tables in ebm_plateno database
 -- Run this in SQL Server Management Studio
 
 USE ebm_plateno;
 GO
 
--- Drop table if exists (use with caution!)
+-- Drop tables if exists (use with caution!)
 -- DROP TABLE IF EXISTS Plates;
+-- DROP TABLE IF EXISTS Dealers;
 -- GO
 
 -- Create Plates table
@@ -19,15 +20,36 @@ CREATE TABLE Plates (
 );
 GO
 
--- Verify table was created
+-- Create Dealers table
+CREATE TABLE Dealers (
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    FullName NVARCHAR(100) NOT NULL,
+    PhoneNumber NVARCHAR(20) NOT NULL,
+    Email NVARCHAR(100) NOT NULL,
+    Username NVARCHAR(50) NOT NULL UNIQUE,
+    Password NVARCHAR(255) NOT NULL,
+    IsActive BIT DEFAULT 1,
+    CreatedDate DATETIME DEFAULT GETDATE(),
+    LastLoginDate DATETIME NULL
+);
+GO
+
+-- Add indexes for better performance
+CREATE INDEX IX_Dealers_Username ON Dealers (Username);
+CREATE INDEX IX_Dealers_Email ON Dealers (Email);
+CREATE INDEX IX_Dealers_IsActive ON Dealers (IsActive);
+GO
+
+-- Verify tables were created
 SELECT 
+    TABLE_NAME,
     COLUMN_NAME,
     DATA_TYPE,
     IS_NULLABLE,
     COLUMN_DEFAULT
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'Plates'
-ORDER BY ORDINAL_POSITION;
+WHERE TABLE_NAME IN ('Plates', 'Dealers')
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
 GO
 
 -- Insert sample data (optional)
@@ -40,6 +62,12 @@ VALUES
     ('ABC 123', 15000, 0, 'CLASSIC', GETDATE());
 GO
 
--- View all plates
+-- Insert sample dealer (optional - remove password hashing in production)
+INSERT INTO Dealers (FullName, PhoneNumber, Email, Username, Password)
+VALUES ('Test Dealer', '012-3456789', 'dealer@example.com', 'testdealer', 'hashed_password_here');
+GO
+
+-- View all data
 SELECT * FROM Plates;
+SELECT * FROM Dealers;
 GO

@@ -18,6 +18,7 @@ export function DealerView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [allResults, setAllResults] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
+  const [allCopied, setAllCopied] = useState(false);
 
   useEffect(() => {
     // Redirect to home if not authenticated
@@ -100,11 +101,38 @@ export function DealerView() {
       document.body.removeChild(textarea);
       
       if (successful) {
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
+        if (id) {
+          setCopiedId(id);
+          setTimeout(() => setCopiedId(null), 2000);
+        } else {
+          setAllCopied(true);
+          setTimeout(() => setAllCopied(false), 2000);
+        }
       }
     } catch (err) {
       console.error('Failed to copy text:', err);
+    }
+  };
+
+  const handleCopyAll = () => {
+    const allPlateText = availableResults
+      .map(plate => `${plate.plateNumber} - RM ${plate.price.toLocaleString()}`)
+      .join('\n');
+    
+    // Try modern Clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(allPlateText)
+        .then(() => {
+          setAllCopied(true);
+          setTimeout(() => setAllCopied(false), 2000);
+        })
+        .catch(() => {
+          // Fallback to legacy method
+          copyTextFallback(allPlateText, null);
+        });
+    } else {
+      // Use fallback method directly
+      copyTextFallback(allPlateText, null);
     }
   };
 
@@ -182,11 +210,30 @@ export function DealerView() {
       </div>
 
       {/* Results */}
-      <div className="mb-4">
+      <div className="mb-4 flex justify-between items-center">
         <p className="text-sm sm:text-base text-gray-600">
           Showing {startIndex + 1}-{Math.min(endIndex, availableResults.length)} of {availableResults.length} {availableResults.length === 1 ? 'plate' : 'plates'}
           {activeCategory !== 'All Carplates' && ` in ${activeCategory}`}
         </p>
+        {availableResults.length > 0 && (
+          <button
+            onClick={handleCopyAll}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm sm:text-base"
+            title="Copy all plate information"
+          >
+            {allCopied ? (
+              <>
+                <Check className="w-4 h-4" />
+                Copied All!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                Copy All Plates
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Plate Grid */}

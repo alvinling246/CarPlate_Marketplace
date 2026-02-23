@@ -7,20 +7,24 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    const success = login(username, password);
-    if (success) {
+    try {
+      await login(username, password);
       setUsername('');
       setPassword('');
       onSuccess();
       onClose();
-    } else {
-      setError('Invalid username or password');
+    } catch (err) {
+      setError(err.message || 'Invalid username or password');
       setPassword('');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -101,16 +105,17 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+              disabled={loading}
+              className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Login
+              {loading ? 'Logging in...' : 'Login'}
             </button>
           </div>
         </form>
 
         <div className="mt-6 pt-6 border-t">
           <p className="text-xs text-gray-500 text-center">
-            Demo credentials: username: <span className="font-mono font-semibold">test</span>, password: <span className="font-mono font-semibold">1234</span>
+            Sign in with your dealer account. Contact admin if you need access.
           </p>
         </div>
       </div>

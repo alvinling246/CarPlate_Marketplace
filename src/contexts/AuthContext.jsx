@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { dealerService } from '../services/dealerService.js';
 
 const AuthContext = createContext(undefined);
-
-const CORRECT_USERNAME = 'test';
-const CORRECT_PASSWORD = '1234';
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -16,13 +14,10 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = (username, password) => {
-    if (username === CORRECT_USERNAME && password === CORRECT_PASSWORD) {
-      setIsAuthenticated(true);
-      localStorage.setItem('dealerAuthenticated', 'true');
-      return true;
-    }
-    return false;
+  const login = async (username, password) => {
+    await dealerService.login(username, password);
+    setIsAuthenticated(true);
+    localStorage.setItem('dealerAuthenticated', 'true');
   };
 
   const logout = () => {

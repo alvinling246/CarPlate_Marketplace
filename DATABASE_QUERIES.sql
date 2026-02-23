@@ -32,7 +32,17 @@ ELSE
 GO
 
 -- ============================================
--- 4. VIEW TABLE STRUCTURE
+-- 4. CHECK IF Dealers TABLE EXISTS
+-- ============================================
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES 
+           WHERE TABLE_NAME = 'Dealers')
+    PRINT 'Dealers table exists!'
+ELSE
+    PRINT 'Dealers table does NOT exist. Run migrations first.';
+GO
+
+-- ============================================
+-- 5. VIEW TABLE STRUCTURE
 -- ============================================
 -- View columns and data types of Plates table
 SELECT 
@@ -46,8 +56,20 @@ WHERE TABLE_NAME = 'Plates'
 ORDER BY ORDINAL_POSITION;
 GO
 
+-- View columns and data types of Dealers table
+SELECT 
+    COLUMN_NAME,
+    DATA_TYPE,
+    CHARACTER_MAXIMUM_LENGTH,
+    IS_NULLABLE,
+    COLUMN_DEFAULT
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'Dealers'
+ORDER BY ORDINAL_POSITION;
+GO
+
 -- ============================================
--- 5. VIEW ALL PLATES DATA
+-- 6. VIEW ALL PLATES DATA
 -- ============================================
 SELECT 
     Id,
@@ -61,7 +83,23 @@ ORDER BY AddedDate DESC;
 GO
 
 -- ============================================
--- 6. COUNT PLATES
+-- 7. VIEW ALL DEALERS DATA
+-- ============================================
+SELECT 
+    Id,
+    FullName,
+    PhoneNumber,
+    Email,
+    Username,
+    IsActive,
+    CreatedDate,
+    LastLoginDate
+FROM Dealers
+ORDER BY CreatedDate DESC;
+GO
+
+-- ============================================
+-- 8. COUNT PLATES
 -- ============================================
 SELECT 
     COUNT(*) AS TotalPlates,
@@ -71,7 +109,17 @@ FROM Plates;
 GO
 
 -- ============================================
--- 7. VIEW PLATES BY CATEGORY
+-- 9. COUNT DEALERS
+-- ============================================
+SELECT 
+    COUNT(*) AS TotalDealers,
+    SUM(CASE WHEN IsActive = 1 THEN 1 ELSE 0 END) AS ActiveDealers,
+    SUM(CASE WHEN IsActive = 0 THEN 1 ELSE 0 END) AS InactiveDealers
+FROM Dealers;
+GO
+
+-- ============================================
+-- 10. VIEW PLATES BY CATEGORY
 -- ============================================
 SELECT 
     Category,
@@ -86,7 +134,7 @@ ORDER BY Count DESC;
 GO
 
 -- ============================================
--- 8. SEARCH PLATES BY NUMBER
+-- 11. SEARCH PLATES BY NUMBER
 -- ============================================
 -- Replace '88' with your search term
 SELECT * 
@@ -96,7 +144,25 @@ ORDER BY Price DESC;
 GO
 
 -- ============================================
--- 9. VIEW AVAILABLE PLATES ONLY
+-- 12. SEARCH DEALERS BY NAME OR USERNAME
+-- ============================================
+-- Replace 'test' with your search term
+SELECT 
+    Id,
+    FullName,
+    PhoneNumber,
+    Email,
+    Username,
+    IsActive,
+    CreatedDate
+FROM Dealers
+WHERE FullName LIKE '%test%' 
+   OR Username LIKE '%test%'
+ORDER BY CreatedDate DESC;
+GO
+
+-- ============================================
+-- 13. VIEW AVAILABLE PLATES ONLY
 -- ============================================
 SELECT 
     Id,
@@ -110,7 +176,23 @@ ORDER BY AddedDate DESC;
 GO
 
 -- ============================================
--- 10. VIEW SOLD PLATES
+-- 14. VIEW ACTIVE DEALERS ONLY
+-- ============================================
+SELECT 
+    Id,
+    FullName,
+    PhoneNumber,
+    Email,
+    Username,
+    CreatedDate,
+    LastLoginDate
+FROM Dealers
+WHERE IsActive = 1
+ORDER BY CreatedDate DESC;
+GO
+
+-- ============================================
+-- 15. VIEW SOLD PLATES
 -- ============================================
 SELECT 
     Id,
@@ -124,7 +206,23 @@ ORDER BY AddedDate DESC;
 GO
 
 -- ============================================
--- 11. INSERT TEST DATA (Optional)
+-- 16. VIEW INACTIVE DEALERS
+-- ============================================
+SELECT 
+    Id,
+    FullName,
+    PhoneNumber,
+    Email,
+    Username,
+    CreatedDate,
+    LastLoginDate
+FROM Dealers
+WHERE IsActive = 0
+ORDER BY CreatedDate DESC;
+GO
+
+-- ============================================
+-- 17. INSERT TEST DATA (Optional)
 -- ============================================
 -- Uncomment to insert test data
 /*
@@ -136,8 +234,15 @@ VALUES
 GO
 */
 
+-- Insert test dealer (optional)
+/*
+INSERT INTO Dealers (FullName, PhoneNumber, Email, Username, Password)
+VALUES ('Test Dealer', '012-3456789', 'dealer@example.com', 'testdealer', 'hashed_password_here');
+GO
+*/
+
 -- ============================================
--- 12. UPDATE PLATE PRICE
+-- 18. UPDATE PLATE PRICE
 -- ============================================
 -- Replace {id} with actual plate ID
 /*
@@ -148,7 +253,7 @@ GO
 */
 
 -- ============================================
--- 13. MARK PLATE AS SOLD
+-- 19. MARK PLATE AS SOLD
 -- ============================================
 -- Replace {id} with actual plate ID
 /*
@@ -159,7 +264,29 @@ GO
 */
 
 -- ============================================
--- 14. DELETE PLATE (Use with caution!)
+-- 20. UPDATE DEALER STATUS
+-- ============================================
+-- Replace {id} with actual dealer ID
+/*
+UPDATE Dealers
+SET IsActive = 0
+WHERE Id = 1;
+GO
+*/
+
+-- ============================================
+-- 21. UPDATE DEALER LAST LOGIN
+-- ============================================
+-- Replace {username} with actual username
+/*
+UPDATE Dealers
+SET LastLoginDate = GETDATE()
+WHERE Username = 'testdealer';
+GO
+*/
+
+-- ============================================
+-- 22. DELETE PLATE (Use with caution!)
 -- ============================================
 -- Replace {id} with actual plate ID
 /*
@@ -169,7 +296,17 @@ GO
 */
 
 -- ============================================
--- 15. CHECK DATABASE SIZE AND INFO
+-- 23. DELETE DEALER (Use with caution!)
+-- ============================================
+-- Replace {id} with actual dealer ID
+/*
+DELETE FROM Dealers
+WHERE Id = 1;
+GO
+*/
+
+-- ============================================
+-- 24. CHECK DATABASE SIZE AND INFO
 -- ============================================
 SELECT 
     name AS DatabaseName,

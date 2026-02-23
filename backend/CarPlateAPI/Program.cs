@@ -38,7 +38,11 @@ if (app.Environment.IsDevelopment())
 // CORS must be BEFORE UseHttpsRedirection and UseAuthorization
 app.UseCors("AllowReactApp");
 
-app.UseHttpsRedirection();
+// Skip HTTPS redirect in development so frontend http://localhost:5000 requests complete
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthorization();
 app.MapControllers();
 

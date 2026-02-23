@@ -1,6 +1,32 @@
 // API service for communicating with .NET backend
 const API_BASE_URL = 'http://localhost:5000/api'; // Change to https://localhost:7000 if using HTTPS
 
+// Admin authentication service
+export const adminService = {
+  // Admin login
+  async login(username, password) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Login failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Admin login error:', error);
+      throw error;
+    }
+  },
+};
+
 export const plateService = {
   // Get all plates with optional filters
   async getPlates(search = '', category = 'All Carplates') {
