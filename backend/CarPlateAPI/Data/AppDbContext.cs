@@ -21,8 +21,14 @@ namespace CarPlateAPI.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.PlateNumber).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Price).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Available");
                 entity.Property(e => e.Category).HasMaxLength(50);
                 entity.Property(e => e.AddedDate).HasDefaultValueSql("GETDATE()");
+                entity.Property(e => e.SoldReservedBy).HasMaxLength(200);
+                entity.Property(e => e.ReservedDate).HasColumnType("date");
+                entity.Property(e => e.SoldDate).HasColumnType("date");
+                entity.Property(e => e.ContactNumber).HasMaxLength(50);
+                entity.Property(e => e.Email).HasMaxLength(100);
             });
 
             modelBuilder.Entity<Dealer>(entity =>

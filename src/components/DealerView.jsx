@@ -63,8 +63,8 @@ export function DealerView() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCopy = (plateNumber, price, id) => {
-    const textToCopy = `${plateNumber} - RM ${price.toLocaleString()}`;
+  const handleCopy = (plate, id) => {
+    const textToCopy = plate.isReserved ? `${plate.plateNumber} - Reserved` : `${plate.plateNumber} - RM ${plate.price.toLocaleString()}`;
     
     // Try modern Clipboard API first
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -116,7 +116,7 @@ export function DealerView() {
 
   const handleCopyAll = () => {
     const allPlateText = availableResults
-      .map(plate => `${plate.plateNumber} - RM ${plate.price.toLocaleString()}`)
+      .map(plate => plate.isReserved ? `${plate.plateNumber} - Reserved` : `${plate.plateNumber} - RM ${plate.price.toLocaleString()}`)
       .join('\n');
     
     // Try modern Clipboard API first
@@ -244,7 +244,7 @@ export function DealerView() {
               <div key={plate.id} className="relative">
                 <PlateCard plate={plate} role="dealer" />
                 <button
-                  onClick={() => handleCopy(plate.plateNumber, plate.price, plate.id)}
+                  onClick={() => handleCopy(plate, plate.id)}
                   className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
                   title="Copy plate info"
                 >

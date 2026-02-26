@@ -23,7 +23,7 @@ export function PlateCard({ plate, role }) {
           <div>
             <p className="text-xs sm:text-sm text-gray-600 mb-1">Price</p>
             <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              RM {plate.price.toLocaleString()}
+              {plate.isReserved ? 'Reserved' : `RM ${plate.price.toLocaleString()}`}
             </p>
           </div>
         </div>

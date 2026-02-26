@@ -44,7 +44,6 @@ export function PlateProvider({ children }) {
   const updatePrice = async (id, newPrice) => {
     try {
       await plateService.updatePrice(id, newPrice);
-      // Reload plates to get updated data
       await loadPlates();
     } catch (err) {
       console.error('Error updating price:', err);
@@ -52,13 +51,52 @@ export function PlateProvider({ children }) {
     }
   };
 
-  const markSold = async (id) => {
+  const updatePlate = async (id, payload) => {
     try {
-      await plateService.markSold(id);
-      // Reload plates to get updated data
+      await plateService.updatePlate(id, payload);
+      await loadPlates();
+    } catch (err) {
+      console.error('Error updating plate:', err);
+      throw err;
+    }
+  };
+
+  const markAvailable = async (id) => {
+    try {
+      await plateService.markAvailable(id);
+      await loadPlates();
+    } catch (err) {
+      console.error('Error marking as available:', err);
+      throw err;
+    }
+  };
+
+  const markReserved = async (id, options = {}) => {
+    try {
+      await plateService.markReserved(id, options);
+      await loadPlates();
+    } catch (err) {
+      console.error('Error marking as reserved:', err);
+      throw err;
+    }
+  };
+
+  const markSold = async (id, options = {}) => {
+    try {
+      await plateService.markSold(id, options);
       await loadPlates();
     } catch (err) {
       console.error('Error marking as sold:', err);
+      throw err;
+    }
+  };
+
+  const deletePlate = async (id) => {
+    try {
+      await plateService.deletePlate(id);
+      await loadPlates();
+    } catch (err) {
+      console.error('Error deleting plate:', err);
       throw err;
     }
   };
@@ -79,8 +117,12 @@ export function PlateProvider({ children }) {
       loading, 
       error,
       addPlate, 
-      updatePrice, 
+      updatePrice,
+      updatePlate, 
+      markAvailable,
+      markReserved, 
       markSold, 
+      deletePlate,
       searchPlates,
       loadPlates 
     }}>

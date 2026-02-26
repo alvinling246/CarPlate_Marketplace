@@ -296,6 +296,15 @@ GO
 */
 
 -- ============================================
+-- 22a. ADD SOLD/RESERVED BY, RESERVED DATE, SOLD DATE TO Plates
+-- ============================================
+-- Run this once to add the new columns. If you get "column already exists", skip.
+-- ALTER TABLE Plates ADD SoldReservedBy NVARCHAR(200) NULL;
+-- ALTER TABLE Plates ADD ReservedDate DATE NULL;
+-- ALTER TABLE Plates ADD SoldDate DATE NULL;
+-- GO
+
+-- ============================================
 -- 23. DELETE DEALER (Use with caution!)
 -- ============================================
 -- Replace {id} with actual dealer ID
