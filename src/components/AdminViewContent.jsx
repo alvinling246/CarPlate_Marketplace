@@ -264,10 +264,6 @@ export function AdminViewContent() {
       setReserveSoldError(reservedSoldMode === 'reserved' ? 'Please select a reserved date.' : 'Please select a sold date.');
       return;
     }
-    if (!useCurrentDate && dateToUse <= today) {
-      setReserveSoldError('Please select a future date.');
-      return;
-    }
 
     setReserveSoldSubmitting(true);
     try {
@@ -923,11 +919,7 @@ export function AdminViewContent() {
                   </div>
                 )}
 
-                {reservedSoldStep === 'form' && (() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  const minFutureDate = tomorrow.toISOString().slice(0, 10);
-                  return (
+                {reservedSoldStep === 'form' && (
                   <form onSubmit={handleReserveSoldSubmit} className="space-y-4">
                     {reserveSoldError && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{reserveSoldError}</div>
@@ -956,12 +948,10 @@ export function AdminViewContent() {
                       <div>
                         <label className="block text-gray-700 mb-2">
                           {reservedSoldMode === 'reserved' ? 'Reserved Date' : 'Sold Date'} <span className="text-red-500">*</span>
-                          <span className="text-gray-500 text-sm font-normal ml-1">(future dates only)</span>
                         </label>
                         <input
                           type="date"
                           value={reserveSoldForm.date}
-                          min={minFutureDate}
                           onChange={(e) => setReserveSoldForm((prev) => ({ ...prev, date: e.target.value }))}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           required={!reserveSoldForm.useCurrentDate}
@@ -1121,8 +1111,7 @@ export function AdminViewContent() {
                       </button>
                     </div>
                   </form>
-                  );
-                })()}
+                )}
               </div>
             </div>
           )}
