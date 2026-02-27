@@ -9,6 +9,7 @@ namespace CarPlateAPI.Models
 
     public class MarkSoldRequest
     {
+        public int? DealerId { get; set; }
         public string? SoldReservedBy { get; set; }
         public string? ContactNumber { get; set; }
         public string? Email { get; set; }
@@ -17,6 +18,7 @@ namespace CarPlateAPI.Models
 
     public class MarkReserveRequest
     {
+        public int? DealerId { get; set; }
         public DateTime? ReservedDate { get; set; }
         public string? SoldReservedBy { get; set; }
         public string? ContactNumber { get; set; }

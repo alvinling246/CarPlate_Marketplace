@@ -170,12 +170,13 @@ export function AdminView() {
     }
     setReserveSoldSubmitting(true);
     try {
+      const dealerId = byWho && byWho !== 'others' ? Number(byWho) : undefined;
       if (reservedSoldMode === 'reserved') {
-        await markReserved(reservedSoldPlate.id, { reservedDate: dateToUse, soldReservedBy, contactNumber, email });
+        await markReserved(reservedSoldPlate.id, { dealerId, reservedDate: dateToUse, soldReservedBy, contactNumber, email });
       } else if (isFromReservedSold) {
         await markSold(reservedSoldPlate.id, { soldDate: dateToUse });
       } else {
-        await markSold(reservedSoldPlate.id, { soldDate: dateToUse, soldReservedBy, contactNumber, email });
+        await markSold(reservedSoldPlate.id, { dealerId, soldDate: dateToUse, soldReservedBy, contactNumber, email });
       }
       closeReservedSoldModal();
     } catch (err) {

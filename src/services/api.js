@@ -242,6 +242,7 @@ export const plateService = {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          dealerId: options.dealerId ?? null,
           reservedDate: options.reservedDate || null,
           soldReservedBy: options.soldReservedBy || null,
           contactNumber: options.contactNumber || null,
@@ -276,6 +277,7 @@ export const plateService = {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          dealerId: options.dealerId ?? null,
           soldReservedBy: options.soldReservedBy ?? null,
           contactNumber: options.contactNumber || null,
           email: options.email || null,
