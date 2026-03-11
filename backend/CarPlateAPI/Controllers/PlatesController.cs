@@ -18,7 +18,7 @@ namespace CarPlateAPI.Controllers
             _context = context;
         }
 
-        private static PlateDto ToDto(Plate p, Reservation? res, Sale? sale, Buyer? resBuyer, Buyer? saleBuyer)
+        private static PlateDto ToDto(Plate p, Transaction? txn, Buyer? buyer)
         {
             var dto = new PlateDto
             {
@@ -26,49 +26,44 @@ namespace CarPlateAPI.Controllers
                 PlateNumber = p.PlateNumber ?? "",
                 Price = p.Price,
                 Status = p.Status ?? "Available",
-                BuyerId = p.BuyerId,
                 Category = p.Category,
                 AddedDate = p.AddedDate,
             };
-            if (p.Status == "Reserved" && res != null && resBuyer != null)
+            if (p.Status == "Reserved" && txn != null && buyer != null)
             {
-                dto.ReservedDate = res.ReservedDate.Date;
-                dto.SoldReservedBy = resBuyer.FullName ?? resBuyer.Dealer?.FullName;
-                dto.ContactNumber = resBuyer.PhoneNumber ?? resBuyer.Dealer?.PhoneNumber;
-                dto.Email = resBuyer.Email ?? resBuyer.Dealer?.Email;
+                dto.ReservedDate = txn.ReservedDate?.Date;
+                dto.SoldReservedBy = buyer.FullName ?? buyer.Dealer?.FullName;
+                dto.ContactNumber = buyer.PhoneNumber ?? buyer.Dealer?.PhoneNumber;
+                dto.Email = buyer.Email ?? buyer.Dealer?.Email;
             }
-            if (p.Status == "Sold" && sale != null && saleBuyer != null)
+            if (p.Status == "Sold" && txn != null && buyer != null)
             {
-                dto.SoldDate = sale.SoldDate.Date;
-                dto.SoldReservedBy = saleBuyer.FullName ?? saleBuyer.Dealer?.FullName;
-                dto.ContactNumber = saleBuyer.PhoneNumber ?? saleBuyer.Dealer?.PhoneNumber;
-                dto.Email = saleBuyer.Email ?? saleBuyer.Dealer?.Email;
+                dto.SoldDate = txn.SoldDate?.Date;
+                dto.SoldReservedBy = buyer.FullName ?? buyer.Dealer?.FullName;
+                dto.ContactNumber = buyer.PhoneNumber ?? buyer.Dealer?.PhoneNumber;
+                dto.Email = buyer.Email ?? buyer.Dealer?.Email;
             }
             return dto;
         }
 
-        private async Task<(List<Reservation> resList, List<Sale> saleList, Dictionary<int, Buyer> buyers)> LoadReservationsAndSales(IEnumerable<int> plateIds)
+        private async Task<(List<Transaction> txns, Dictionary<int, Buyer> buyers)> LoadTransactions(IEnumerable<int> plateIds)
         {
             var pidList = plateIds.Distinct().ToList();
             if (pidList.Count == 0)
-                return (new List<Reservation>(), new List<Sale>(), new Dictionary<int, Buyer>());
+                return (new List<Transaction>(), new Dictionary<int, Buyer>());
 
-            var resList = await _context.Reservations
-                .Where(r => pidList.Contains(r.PlateNoId) && r.Status == "Active")
-                .OrderByDescending(r => r.Id)
-                .ToListAsync();
-            var saleList = await _context.Sales
-                .Where(s => pidList.Contains(s.PlateNoId))
+            var txns = await _context.Transactions
+                .Where(t => pidList.Contains(t.PlateNoId))
                 .OrderByDescending(s => s.Id)
                 .ToListAsync();
 
-            var buyerIds = resList.Select(r => r.BuyerId).Union(saleList.Select(s => s.BuyerId)).Distinct().ToList();
+            var buyerIds = txns.Select(t => t.PurchasedId).Distinct().ToList();
             var buyers = await _context.Buyers
                 .Include(b => b.Dealer)
                 .Where(b => buyerIds.Contains(b.Id))
                 .ToDictionaryAsync(b => b.Id, b => b);
 
-            return (resList, saleList, buyers);
+            return (txns, buyers);
         }
 
         // GET: api/Plates
@@ -86,18 +81,15 @@ namespace CarPlateAPI.Controllers
 
             var plates = await query.OrderByDescending(p => p.AddedDate).ToListAsync();
             var plateIds = plates.Select(p => p.Id).ToList();
-            var (resList, saleList, buyers) = await LoadReservationsAndSales(plateIds);
+            var (txns, buyers) = await LoadTransactions(plateIds);
 
-            var latestResByPlate = resList.GroupBy(r => r.PlateNoId).ToDictionary(g => g.Key, g => g.First());
-            var latestSaleByPlate = saleList.GroupBy(s => s.PlateNoId).ToDictionary(g => g.Key, g => g.First());
+            var latestTxnByPlate = txns.GroupBy(t => t.PlateNoId).ToDictionary(g => g.Key, g => g.First());
 
             var result = plates.Select(p =>
             {
-                latestResByPlate.TryGetValue(p.Id, out var res);
-                latestSaleByPlate.TryGetValue(p.Id, out var sale);
-                buyers.TryGetValue(res?.BuyerId ?? 0, out var resBuyer);
-                buyers.TryGetValue(sale?.BuyerId ?? 0, out var saleBuyer);
-                return ToDto(p, res, sale, resBuyer, saleBuyer);
+                latestTxnByPlate.TryGetValue(p.Id, out var txn);
+                buyers.TryGetValue(txn?.PurchasedId ?? 0, out var buyer);
+                return ToDto(p, txn, buyer);
             }).ToList();
 
             return result;
@@ -110,13 +102,10 @@ namespace CarPlateAPI.Controllers
             var plate = await _context.Plates.FindAsync(id);
             if (plate == null) return NotFound();
 
-            var (resList, saleList, buyers) = await LoadReservationsAndSales(new[] { id });
-            var res = resList.FirstOrDefault(r => r.PlateNoId == id);
-            var sale = saleList.FirstOrDefault(s => s.PlateNoId == id);
-            buyers.TryGetValue(res?.BuyerId ?? 0, out var resBuyer);
-            buyers.TryGetValue(sale?.BuyerId ?? 0, out var saleBuyer);
-
-            return ToDto(plate, res, sale, resBuyer, saleBuyer);
+            var (txns, buyers) = await LoadTransactions(new[] { id });
+            var txn = txns.FirstOrDefault(t => t.PlateNoId == id);
+            buyers.TryGetValue(txn?.PurchasedId ?? 0, out var buyer);
+            return ToDto(plate, txn, buyer);
         }
 
         // POST: api/Plates
@@ -141,12 +130,11 @@ namespace CarPlateAPI.Controllers
                 Price = plate.Price,
                 Status = status,
                 Category = plate.Category,
-                BuyerId = plate.BuyerId,
                 AddedDate = DateTime.Now,
             };
             _context.Plates.Add(entity);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetPlate), new { id = entity.Id }, ToDto(entity, null, null, null, null));
+            return CreatedAtAction(nameof(GetPlate), new { id = entity.Id }, ToDto(entity, null, null));
         }
 
         // PATCH: api/Plates/5
@@ -243,14 +231,17 @@ namespace CarPlateAPI.Controllers
             var buyer = await GetOrCreateBuyer(body?.DealerId, byWho, contact, email);
             var reservedDate = body?.ReservedDate?.Date ?? DateTime.Now.Date;
 
-            var reservation = new Reservation
+            var txn = new Transaction
             {
                 PlateNoId = id,
-                BuyerId = buyer.Id,
+                PurchasedId = buyer.Id,
+                DealerOrBuyer = buyer.DealerId.HasValue ? 1 : 0,
                 ReservedDate = reservedDate,
-                Status = "Active",
+                SoldDate = null,
+                SoldPrice = null,
+                Status = "Reserved",
             };
-            _context.Reservations.Add(reservation);
+            _context.Transactions.Add(txn);
             plate.Status = "Reserved";
             await _context.SaveChangesAsync();
             return NoContent();
@@ -263,12 +254,12 @@ namespace CarPlateAPI.Controllers
             var plate = await _context.Plates.FindAsync(id);
             if (plate == null) return NotFound();
 
-            var activeRes = await _context.Reservations
-                .Where(r => r.PlateNoId == id && r.Status == "Active")
-                .OrderByDescending(r => r.Id)
+            var activeTxn = await _context.Transactions
+                .Where(t => t.PlateNoId == id && t.Status == "Reserved")
+                .OrderByDescending(t => t.Id)
                 .FirstOrDefaultAsync();
-            if (activeRes != null)
-                activeRes.Status = "Cancelled";
+            if (activeTxn != null)
+                activeTxn.Status = "Cancelled";
             plate.Status = "Available";
             await _context.SaveChangesAsync();
             return NoContent();
@@ -281,22 +272,15 @@ namespace CarPlateAPI.Controllers
             var plate = await _context.Plates.FindAsync(id);
             if (plate == null) return NotFound();
 
-            int? reservationId = null;
-            var activeRes = await _context.Reservations
-                .Where(r => r.PlateNoId == id && r.Status == "Active")
-                .OrderByDescending(r => r.Id)
+            var activeTxn = await _context.Transactions
+                .Where(t => t.PlateNoId == id && t.Status == "Reserved")
+                .OrderByDescending(t => t.Id)
                 .FirstOrDefaultAsync();
-            if (activeRes != null)
-            {
-                reservationId = activeRes.Id;
-                activeRes.Status = "Converted to Sale";
-                await _context.SaveChangesAsync();
-            }
 
             Buyer buyer;
-            if (plate.Status == "Reserved" && activeRes != null)
+            if (plate.Status == "Reserved" && activeTxn != null)
             {
-                buyer = await _context.Buyers.FindAsync(activeRes.BuyerId) ?? throw new InvalidOperationException("Buyer not found.");
+                buyer = await _context.Buyers.FindAsync(activeTxn.PurchasedId) ?? throw new InvalidOperationException("Buyer not found.");
             }
             else
             {
@@ -309,15 +293,29 @@ namespace CarPlateAPI.Controllers
             }
 
             var soldDate = body?.SoldDate?.Date ?? DateTime.Now.Date;
-            var sale = new Sale
+
+            if (activeTxn != null)
             {
-                PlateNoId = id,
-                BuyerId = buyer.Id,
-                ReservationId = reservationId,
-                SoldDate = soldDate,
-                SoldPrice = plate.Price,
-            };
-            _context.Sales.Add(sale);
+                activeTxn.PurchasedId = buyer.Id;
+                activeTxn.DealerOrBuyer = buyer.DealerId.HasValue ? 1 : 0;
+                activeTxn.SoldDate = soldDate;
+                activeTxn.SoldPrice = Convert.ToDouble(plate.Price);
+                activeTxn.Status = "Sold";
+            }
+            else
+            {
+                var txn = new Transaction
+                {
+                    PlateNoId = id,
+                    PurchasedId = buyer.Id,
+                    DealerOrBuyer = buyer.DealerId.HasValue ? 1 : 0,
+                    ReservedDate = null,
+                    SoldDate = soldDate,
+                    SoldPrice = Convert.ToDouble(plate.Price),
+                    Status = "Sold",
+                };
+                _context.Transactions.Add(txn);
+            }
             plate.Status = "Sold";
             await _context.SaveChangesAsync();
             return NoContent();
@@ -330,10 +328,8 @@ namespace CarPlateAPI.Controllers
         {
             var plate = await _context.Plates.FindAsync(id);
             if (plate == null) return NotFound();
-            var reservations = await _context.Reservations.Where(r => r.PlateNoId == id).ToListAsync();
-            var sales = await _context.Sales.Where(s => s.PlateNoId == id).ToListAsync();
-            _context.Reservations.RemoveRange(reservations);
-            _context.Sales.RemoveRange(sales);
+            var txns = await _context.Transactions.Where(t => t.PlateNoId == id).ToListAsync();
+            _context.Transactions.RemoveRange(txns);
             _context.Plates.Remove(plate);
             await _context.SaveChangesAsync();
             return NoContent();

@@ -1,13 +1,12 @@
 namespace CarPlateAPI.Models
 {
-    /// <summary>Plate response shape for API; includes reserved/sold info from Reservation/Sale + Buyer.</summary>
+    /// <summary>Plate response shape for API; includes reserved/sold info from Transaction + Buyer.</summary>
     public class PlateDto
     {
         public int Id { get; set; }
         public string PlateNumber { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public string Status { get; set; } = "Available";
-        public int? BuyerId { get; set; }
         public string? Category { get; set; }
         public DateTime AddedDate { get; set; }
         public string? SoldReservedBy { get; set; }

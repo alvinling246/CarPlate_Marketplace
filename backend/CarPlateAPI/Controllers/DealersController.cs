@@ -18,6 +18,23 @@ namespace CarPlateAPI.Controllers
             _context = context;
         }
 
+        private static DealerDto ToDto(Dealer d)
+        {
+            return new DealerDto
+            {
+                Id = d.Id,
+                FullName = d.FullName ?? "",
+                PhoneNumber = d.PhoneNumber ?? "",
+                Email = d.Email ?? "",
+                UserId = d.UserId,
+                Username = d.User?.Username ?? "",
+                Role = d.User?.Role ?? "Dealer",
+                IsActive = d.User?.IsActive ?? true,
+                CreatedDate = d.User?.CreatedDate ?? default,
+                LastLoginDate = d.User?.LastLoginDate
+            };
+        }
+
         // POST: api/Dealers/login
         [HttpPost("login")]
         public async Task<ActionResult<object>> Login([FromBody] DealerLoginRequest request)
@@ -31,46 +48,52 @@ namespace CarPlateAPI.Controllers
                 return BadRequest(new { message = "Password is required." });
 
             // Case-insensitive username lookup (DB may have different casing)
-            var dealer = await _context.Dealers
-                .FirstOrDefaultAsync(d => d.Username != null && d.Username.ToLower() == username.ToLower());
-            if (dealer == null)
+            var user = await _context.Users
+                .Include(u => u.Dealer)
+                .FirstOrDefaultAsync(u => u.Role == "Dealer" && u.Username.ToLower() == username.ToLower());
+
+            if (user?.Dealer == null)
                 return Unauthorized(new { message = "Invalid username or password." });
-            if (!dealer.IsActive)
+            if (!user.IsActive)
                 return Unauthorized(new { message = "This dealer account is inactive." });
             // Compare password (trim both to avoid whitespace issues)
-            var storedPassword = dealer.Password?.Trim() ?? "";
+            var storedPassword = user.Password?.Trim() ?? "";
             if (storedPassword != password.Trim())
                 return Unauthorized(new { message = "Invalid username or password." });
 
-            dealer.LastLoginDate = DateTime.UtcNow;
+            user.LastLoginDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            return Ok(new { id = dealer.Id, username = dealer.Username, fullName = dealer.FullName });
+            return Ok(new { id = user.Dealer.Id, username = user.Username, fullName = user.Dealer.FullName, userId = user.Id, role = user.Role });
         }
 
         // GET: api/Dealers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Dealer>>> GetDealers()
+        public async Task<ActionResult<IEnumerable<DealerDto>>> GetDealers()
         {
-            return await _context.Dealers
-                .OrderByDescending(d => d.CreatedDate)
+            var dealers = await _context.Dealers
+                .Include(d => d.User)
+                .OrderByDescending(d => d.User.CreatedDate)
                 .ToListAsync();
+            return dealers.Select(ToDto).ToList();
         }
 
         // GET: api/Dealers/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Dealer>> GetDealer(int id)
+        public async Task<ActionResult<DealerDto>> GetDealer(int id)
         {
-            var dealer = await _context.Dealers.FindAsync(id);
+            var dealer = await _context.Dealers
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.Id == id);
             if (dealer == null) return NotFound();
-            return dealer;
+            return ToDto(dealer);
         }
 
         // POST: api/Dealers
         [HttpPost]
-        public async Task<ActionResult<Dealer>> PostDealer(Dealer dealer)
+        public async Task<ActionResult<DealerDto>> PostDealer([FromBody] DealerUpsertRequest dealer)
         {
-            if (string.IsNullOrWhiteSpace(dealer.FullName))
+            if (string.IsNullOrWhiteSpace(dealer?.FullName))
                 return BadRequest(new { message = "Full name is required." });
             if (string.IsNullOrWhiteSpace(dealer.PhoneNumber))
                 return BadRequest(new { message = "Phone number is required." });
@@ -82,38 +105,64 @@ namespace CarPlateAPI.Controllers
                 return BadRequest(new { message = "Password is required." });
 
             var usernameNorm = (dealer.Username ?? "").Trim();
-            var exists = await _context.Dealers.AnyAsync(d => d.Username == usernameNorm);
+            var exists = await _context.Users.AnyAsync(u => u.Username == usernameNorm);
             if (exists)
                 return BadRequest(new { message = "A dealer with this username already exists." });
+
+            var user = new User
+            {
+                Username = usernameNorm,
+                Password = dealer.Password,
+                Role = "Dealer",
+                IsActive = true,
+                CreatedDate = DateTime.UtcNow
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
 
             var entity = new Dealer
             {
                 FullName = (dealer.FullName ?? "").Trim(),
                 PhoneNumber = (dealer.PhoneNumber ?? "").Trim(),
                 Email = (dealer.Email ?? "").Trim(),
-                Username = usernameNorm,
-                Password = dealer.Password,
-                IsActive = true,
-                CreatedDate = DateTime.Now
+                UserId = user.Id
             };
             _context.Dealers.Add(entity);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetDealer), new { id = entity.Id }, entity);
+
+            entity.User = user;
+            return CreatedAtAction(nameof(GetDealer), new { id = entity.Id }, ToDto(entity));
         }
 
         // PUT: api/Dealers/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutDealer(int id, Dealer dealer)
+        public async Task<IActionResult> PutDealer(int id, [FromBody] DealerUpsertRequest dealer)
         {
-            var entity = await _context.Dealers.FindAsync(id);
+            var entity = await _context.Dealers
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.Id == id);
             if (entity == null) return NotFound();
 
-            if (!string.IsNullOrWhiteSpace(dealer.FullName)) entity.FullName = dealer.FullName.Trim();
-            if (!string.IsNullOrWhiteSpace(dealer.PhoneNumber)) entity.PhoneNumber = dealer.PhoneNumber.Trim();
-            if (!string.IsNullOrWhiteSpace(dealer.Email)) entity.Email = dealer.Email.Trim();
-            if (!string.IsNullOrWhiteSpace(dealer.Username)) entity.Username = dealer.Username.Trim();
-            if (!string.IsNullOrWhiteSpace(dealer.Password)) entity.Password = dealer.Password;
-            entity.IsActive = dealer.IsActive;
+            if (!string.IsNullOrWhiteSpace(dealer?.FullName)) entity.FullName = dealer.FullName.Trim();
+            if (!string.IsNullOrWhiteSpace(dealer?.PhoneNumber)) entity.PhoneNumber = dealer.PhoneNumber.Trim();
+            if (!string.IsNullOrWhiteSpace(dealer?.Email)) entity.Email = dealer.Email.Trim();
+
+            if (entity.User == null)
+                return StatusCode(500, new { message = "Dealer user link is missing." });
+
+            if (!string.IsNullOrWhiteSpace(dealer?.Username))
+            {
+                var usernameNorm = dealer.Username.Trim();
+                var exists = await _context.Users.AnyAsync(u => u.Id != entity.UserId && u.Username == usernameNorm);
+                if (exists)
+                    return BadRequest(new { message = "A user with this username already exists." });
+                entity.User.Username = usernameNorm;
+            }
+            if (!string.IsNullOrWhiteSpace(dealer?.Password))
+                entity.User.Password = dealer.Password;
+            if (dealer?.IsActive.HasValue == true)
+                entity.User.IsActive = dealer.IsActive.Value;
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -123,10 +172,21 @@ namespace CarPlateAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDealer(int id)
         {
-            var dealer = await _context.Dealers.FindAsync(id);
+            var dealer = await _context.Dealers
+                .Include(d => d.User)
+                .FirstOrDefaultAsync(d => d.Id == id);
             if (dealer == null) return NotFound();
+
+            var user = dealer.User;
             _context.Dealers.Remove(dealer);
             await _context.SaveChangesAsync();
+
+            if (user != null)
+            {
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+            }
+
             return NoContent();
         }
     }

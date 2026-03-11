@@ -1,5 +1,5 @@
 -- ============================================
--- Migrate existing Plates data into Buyers, Reservation, Sales
+-- Migrate existing Plates data into Buyers + Transaction
 -- Run CreateFiveTableSchema.sql first. Run this only if Plates still have SoldReservedBy/ReservedDate/SoldDate etc.
 -- ============================================
 -- USE ebm_plateno;
@@ -10,7 +10,11 @@ IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Buyer
     RAISERROR('Run CreateFiveTableSchema.sql first.', 16, 1);
 GO
 
--- Migrate Reserved plates: create Buyer + Reservation
+IF OBJECT_ID(N'dbo.[Transaction]', N'U') IS NULL
+    RAISERROR('Run CreateFiveTableSchema.sql first (Transaction table missing).', 16, 1);
+GO
+
+-- Migrate Reserved plates: create Buyer + Transaction
 DECLARE @PlateId INT, @SoldReservedBy NVARCHAR(200), @ReservedDate DATE, @ContactNumber NVARCHAR(50), @Email NVARCHAR(100);
 DECLARE @BuyerId INT;
 
@@ -29,17 +33,17 @@ BEGIN
         INSERT INTO dbo.Buyers (DealerId, FullName, PhoneNumber, Email)
         VALUES (NULL, @SoldReservedBy, ISNULL(@ContactNumber,''), @Email);
         SET @BuyerId = SCOPE_IDENTITY();
-        INSERT INTO dbo.Reservation (PlateNoId, BuyerId, ReservedDate, ExpiryDate, Status)
-        VALUES (@PlateId, @BuyerId, ISNULL(CAST(@ReservedDate AS DATETIME), GETDATE()), NULL, 'Active');
+        INSERT INTO dbo.[Transaction] (PlateNoId, PurchasedId, DealerOrBuyer, ReservedDate, SoldDate, SoldPrice, Status)
+        VALUES (@PlateId, @BuyerId, 0, ISNULL(CAST(@ReservedDate AS DATETIME), GETDATE()), NULL, NULL, 'Reserved');
         FETCH NEXT FROM rc INTO @PlateId, @SoldReservedBy, @ReservedDate, @ContactNumber, @Email;
     END
     CLOSE rc;
     DEALLOCATE rc;
-    PRINT 'Migrated Reserved plates to Buyers + Reservation.';
+    PRINT 'Migrated Reserved plates to Buyers + Transaction.';
 END
 GO
 
--- Migrate Sold plates: create Buyer + Sale (reuse Buyer by name+phone if possible to avoid duplicates)
+-- Migrate Sold plates: create Buyer + Transaction
 DECLARE @PlateId INT, @SoldReservedBy NVARCHAR(200), @SoldDate DATE, @Price DECIMAL(18,2), @ContactNumber NVARCHAR(50), @Email NVARCHAR(100);
 DECLARE @BuyerId INT;
 
@@ -58,13 +62,13 @@ BEGIN
         INSERT INTO dbo.Buyers (DealerId, FullName, PhoneNumber, Email)
         VALUES (NULL, @SoldReservedBy, ISNULL(@ContactNumber,''), @Email);
         SET @BuyerId = SCOPE_IDENTITY();
-        INSERT INTO dbo.Sales (PlateNoId, BuyerId, ReservationId, SoldDate, SoldPrice)
-        VALUES (@PlateId, @BuyerId, NULL, ISNULL(CAST(@SoldDate AS DATETIME), GETDATE()), ISNULL(@Price, 0));
+        INSERT INTO dbo.[Transaction] (PlateNoId, PurchasedId, DealerOrBuyer, ReservedDate, SoldDate, SoldPrice, Status)
+        VALUES (@PlateId, @BuyerId, 0, NULL, ISNULL(CAST(@SoldDate AS DATETIME), GETDATE()), CAST(@Price AS FLOAT), 'Sold');
         FETCH NEXT FROM sc INTO @PlateId, @SoldReservedBy, @SoldDate, @Price, @ContactNumber, @Email;
     END
     CLOSE sc;
     DEALLOCATE sc;
-    PRINT 'Migrated Sold plates to Buyers + Sales.';
+    PRINT 'Migrated Sold plates to Buyers + Transaction.';
 END
 GO
 
